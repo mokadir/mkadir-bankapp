@@ -2,21 +2,21 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: mysql
+  name: my-deploy-mybanksql
 spec:
   selector:
     matchLabels:
-      app: mysql
+      app: mybanksql
   strategy:
     type: Recreate
   template:
     metadata:
       labels:
-        app: mysql
+        app: mybanksql
     spec:
       containers:
         - image: mysql:8
-          name: mysql
+          name: mybanksql
           resources:
             limits:
               memory: 512Mi
@@ -31,37 +31,37 @@ spec:
               value: "bankappdb"
           ports:
             - containerPort: 3306
-              name: mysql
+              name: mybanksql
 ---
 # MySQL Service
 apiVersion: v1
 kind: Service
 metadata:
-  name: mysql-service
+  name: my-svc-mybanksql
 spec:
   ports:
     - port: 3306
   selector:
-    app: mysql
+    app: mybanksql
 ---
 # Java Application Deployment
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: bankapp
+  name: my-deploy-bankapp
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: bankapp
+      app: bank-app
   template:
     metadata:
       labels:
-        app: bankapp
+        app: bank-app
     spec:
       containers:
-        - name: bankapp
-          image: adijaiswal/bankapp:latest
+        - name: bank-app
+          image: mskr7/mkadir-bankapp:latest
           resources:
             limits:
               memory: 512Mi
@@ -73,21 +73,24 @@ spec:
             - containerPort: 8080
           env:
             - name: SPRING_DATASOURCE_URL
-              value: jdbc:mysql://mysql-service:3306/bankappdb?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+              value: jdbc:mybanksql://my-svc-mybanksql:3306/bankappdb?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
             - name: SPRING_DATASOURCE_USERNAME
               value: root
             - name: SPRING_DATASOURCE_PASSWORD
               value: Test@123
 ---
-# Bank Application Service
 apiVersion: v1
 kind: Service
 metadata:
-  name: bankapp-service
+  labels:
+    app: bank-app
+  name: my-svc-bankapp
+  namespace: ns-app
 spec:
-  type: LoadBalancer
+  type: NodePort
   ports:
-    - port: 80
-      targetPort: 8080
+    - nodePort: 30006 # The port on the node to expose the service on. match with extraPortMappings containerPort if in kind config
+      port: 80 # The port the service is exposed on. can be any port, but 80 is standard for HTTP
+      targetPort: 8080 # The port your application is listening on. match with containerPort in deployment.yaml and docker webserver exposed port
   selector:
-    app: bankapp
+    app: bank-app
